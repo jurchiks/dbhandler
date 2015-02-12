@@ -145,6 +145,46 @@ class PreparedStatement
 	}
 	
 	/**
+	 * Execute a function for each row in the result set.
+	 * The function must accept an array as the first parameter, an integer
+	 * as an optional second parameter (row index in the result set),
+	 * and should not return anything.
+	 * 
+	 * @param callable $func : the function to execute on each row
+	 * @throws DbException if the statement hasn't been executed yet
+	 */
+	public function forEachRow(callable $func)
+	{
+		if (!$this->statementExecuted)
+		{
+			throw new DbException('Cannot iterate over rows if statement is not executed');
+		}
+		
+		$rows = $this->fetchAllRows();
+		
+		array_walk($rows, $func);
+	}
+	
+	/**
+	 * Apply a function to each row of the result set.
+	 * The function must accept as many parameters as there are columns
+	 * in the statement, and return whatever you want it to return.
+	 * 
+	 * @param callable $func : the function to execute on each row
+	 * @throws DbException if the statement hasn't been executed yet
+	 * @return array the result of the callback function being applied to all rows
+	 */
+	public function map(callable $func)
+	{
+		if (!$this->statementExecuted)
+		{
+			throw new DbException('Cannot iterate over rows if statement is not executed');
+		}
+		
+		return $this->fetchAllRows(\PDO::FETCH_FUNC, $func);
+	}
+	
+	/**
 	 * Get the number of found rows from a SELECT statement.
 	 * Works only if the previous statement used the SQL_CALC_FOUND_ROWS modifier.
 	 * 

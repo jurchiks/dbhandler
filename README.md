@@ -1,12 +1,14 @@
 # dbhandler
 
+Requirements: PHP 5.4+
+
 These classes are made to simplify database operations via the PHP PDO interface.
 
 Using PDO's native methods makes for a lot of code bloat, so I've made this project
 to avoid that. There are also some pitfalls that I've worked around.
 
-To work with these classes, include the provided autoloader (PHP 5.3+) in your
-bootloader and specify the database connection parameters in the getInstance() method
+To work with these classes, include the provided autoloader in your bootloader
+and specify the database connection parameters in the getInstance() method
 of the Handler class.
 
 Code examples:
@@ -42,6 +44,23 @@ Code examples:
 		$names = $stmt->fetchAllRowsOfColumn();
 		// $names = [ name, name, ... ]
 		$totalFound = $stmt->getFoundRows();
+		
+		\database\Handler::getInstance()
+			->prepare('SELECT id, name, accesslevel FROM abc WHERE something = ? LIMIT 10')
+			->execute(array($something))
+			->forEachRow(function (array $row, $index)
+			{
+				echo ($index + 1), '. ', $row['name'], ' (', $row['id'], ')<br/>';
+			});
+		
+		$users = \database\Handler::getInstance()
+			->prepare('SELECT id, name, accesslevel FROM abc WHERE something = ? LIMIT 10')
+			->execute(array($something))
+			->map(function ($id, $name, $accesslevel)
+			{
+				// [id] name (access)
+				return "[{$id}] {$name} (" . getAccessLevelName($accesslevel) . ')';
+			});
 	}
 	catch (DbException $e)
 	{
