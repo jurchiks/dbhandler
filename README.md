@@ -11,41 +11,43 @@ of the Handler class.
 
 Code examples:
 
-	try
-	{
-		// example #1 - no parameters or fixed parameters, no return value
-		\database\Handler::getInstance()
-			->exec('TRUNCATE TABLE abc');
-		\database\Handler::getInstance()
-			->exec('UPDATE abc SET col1 = 2 WHERE col1 = 1');
-		
-		// example #2 - fixed parameters with return value
-		$name = \database\Handler::getInstance()
-			->query('SELECT name FROM abc WHERE id = 1');
-		
-		// example #3 - variable parameters with return value
-		$id = 2;
-		$name = \database\Handler::getInstance()
-			->prepare('SELECT name FROM abc WHERE id = ?')
-			->execute(array($id))
-			->fetchColumn();
-		
-		$users = \database\Handler::getInstance()
-			->prepare('SELECT id, name, accesslevel FROM abc WHERE something = ? LIMIT 10')
-			->execute(array($something))
-			->fetchAllRows();
-		// $users = [ { id, name, accesslevel }, ... ]
-		
-		$stmt = \database\Handler::getInstance()
-			->prepare('SELECT SQL_CALC_FOUND_ROWS name FROM abc WHERE something = ? LIMIT 10')
-			->execute(array($something));
-		$names = $stmt->fetchAllRowsOfColumn();
-		// $names = [ name, name, ... ]
-		$totalFound = $stmt->getFoundRows();
-	}
-	catch (DbException $e)
-	{
-		echo $e->getMessage(), '<br/>',
-			'Query: ', $e->getQuery(), '<br/>';
-		print_r($e->getErrorInfo());
-	}
+```php
+try
+{
+	// example #1 - no parameters or fixed parameters, no return value
+	\database\Handler::getInstance()
+		->exec('TRUNCATE TABLE abc');
+	\database\Handler::getInstance()
+		->exec('UPDATE abc SET col1 = 2 WHERE col1 = 1');
+	
+	// example #2 - fixed parameters with return value
+	$name = \database\Handler::getInstance()
+		->query('SELECT name FROM abc WHERE id = 1');
+	
+	// example #3 - variable parameters with return value
+	$id = 2;
+	$name = \database\Handler::getInstance()
+		->prepare('SELECT name FROM abc WHERE id = ?')
+		->execute(array($id))
+		->fetchColumn();
+	
+	$users = \database\Handler::getInstance()
+		->prepare('SELECT id, name, accesslevel FROM abc WHERE something = ? LIMIT 10')
+		->execute(array($something))
+		->fetchAllRows();
+	// $users = [ { id, name, accesslevel }, ... ]
+	
+	$stmt = \database\Handler::getInstance()
+		->prepare('SELECT SQL_CALC_FOUND_ROWS name FROM abc WHERE something = ? LIMIT 10')
+		->execute(array($something));
+	$names = $stmt->fetchAllRowsOfColumn();
+	// $names = [ name, name, ... ]
+	$totalFound = $stmt->getFoundRows();
+}
+catch (DbException $e)
+{
+	echo $e->getMessage(), '<br/>',
+		'Query: ', $e->getQuery(), '<br/>';
+	print_r($e->getErrorInfo());
+}
+```
