@@ -37,13 +37,13 @@ try
 		->prepare('SELECT id, name, accesslevel FROM abc WHERE something = ? LIMIT 10')
 		->execute(array($something))
 		->fetchAllRows();
-	// $users = [ { id, name, accesslevel }, ... ]
+	// $users = [ [ 'id' => 1, 'name' => 'something', 'accesslevel' => 1 ], ... ]
 	
 	$stmt = \database\Handler::getInstance()
 		->prepare('SELECT SQL_CALC_FOUND_ROWS name FROM abc WHERE something = ? LIMIT 10')
 		->execute(array($something));
 	$names = $stmt->fetchAllRowsOfColumn();
-	// $names = [ name, name, ... ]
+	// $names = [ 'name' => 'foo', 'name' => 'bar', ... ]
 	$totalFound = $stmt->getFoundRows();
 	
 	\database\Handler::getInstance()
