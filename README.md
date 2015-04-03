@@ -43,7 +43,7 @@ try
 		->prepare('SELECT SQL_CALC_FOUND_ROWS name FROM abc WHERE something = ? LIMIT 10')
 		->execute(array($something));
 	$names = $stmt->fetchAllRowsOfColumn();
-	// $names = [ 'name' => 'foo', 'name' => 'bar', ... ]
+	// $names = [ 'foo', 'bar', ... ]
 	$totalFound = $stmt->getFoundRows();
 	
 	\database\Handler::getInstance()
