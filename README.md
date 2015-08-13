@@ -24,7 +24,8 @@ try
 	
 	// example #2 - fixed parameters with return value
 	$name = \database\Handler::getInstance()
-		->query('SELECT name FROM abc WHERE id = 1');
+		->query('SELECT name FROM abc WHERE id = 1')
+		->fetchColumn();
 	
 	// example #3 - variable parameters with return value
 	$id = 2;
