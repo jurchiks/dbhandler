@@ -16,6 +16,8 @@ class PreparedStatement
 	private $isCalcRows;
 	/** @var boolean */
 	private $statementExecuted = false;
+	/** @var int */
+	private $foundRows = 0;
 	
 	/**
 	 * Create a new PreparedStatement object.
@@ -56,6 +58,29 @@ class PreparedStatement
 		}
 		
 		$this->statementExecuted = true;
+		
+		if ($this->isCalcRows)
+		{
+			try
+			{
+				$result = $this->connection->query('SELECT FOUND_ROWS()');
+				
+				if ($result === false)
+				{
+					$this->foundRows = 0;
+				}
+				else
+				{
+					$count = $result->fetchColumn(0);
+					$this->foundRows = (empty($count) ? 0 : intval($count));
+				}
+			}
+			catch (\Exception $e)
+			{
+				$this->foundRows = 0;
+			}
+		}
+		
 		return $this;
 	}
 	
@@ -192,28 +217,7 @@ class PreparedStatement
 	 */
 	public function getFoundRows()
 	{
-		if (!$this->isCalcRows || !$this->statementExecuted)
-		{
-			return 0;
-		}
-		
-		try
-		{
-			$result = $this->connection->query('SELECT FOUND_ROWS()');
-			
-			if ($result === false)
-			{
-				return 0;
-			}
-			
-			$count = $result->fetchColumn(0);
-			
-			return (empty($count) ? 0 : intval($count));
-		}
-		catch (\Exception $e)
-		{
-			return 0;
-		}
+		return $this->foundRows;
 	}
 	
 	/**
