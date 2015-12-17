@@ -1,5 +1,7 @@
 <?php
-namespace database;
+namespace js\tools\dbhandler;
+
+use js\tools\dbhandler\exceptions\DbException;
 
 /**
  * @author Juris Sudmalis
@@ -9,24 +11,35 @@ class Handler
 	/** @var \PDO */
 	private $connection;
 	
-	private function __construct(array $params, array $customOptions = array())
+	/**
+	 * Construct a new Handler instance.
+	 * 
+	 * @param array $connectionParameters : an array containing connection parameters.
+	 * Required parameters: driver, username, password, database.
+	 * Optional parameters: socket | host[, port] (by default, host=localhost).
+	 * @param array $customOptions : custom PDO::ATTR_* values, e.g., [ PDO::ATTR_PERSISTENT => true ]
+	 * @throws DbException if something goes wrong. This is the base exception class for all exceptions thrown by this library.
+	 */
+	public function __construct(array $connectionParameters, array $customOptions = [])
 	{
-		if (!isset($params['type'], $params['dbname'], $params['username'], $params['password']))
+		if (!isset($connectionParameters['driver'], $connectionParameters['database'], $connectionParameters['username'], $connectionParameters['password']))
 		{
-			throw new DbException('Missing database connection parameters');
+			throw new DbException('Missing required database connection parameters');
 		}
 		
-		static $defaultOptions = array(
+		self::checkDriver($connectionParameters['driver']);
+		
+		static $defaultOptions = [
 			\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
 			\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
-		);
+		];
 		
 		try
 		{
 			$this->connection = new \PDO(
-				self::buildDNSString($params),
-				$params['username'],
-				$params['password'],
+				self::buildDNSString($connectionParameters),
+				$connectionParameters['username'],
+				$connectionParameters['password'],
 				array_merge($defaultOptions, $customOptions)
 			);
 		}
@@ -41,62 +54,6 @@ class Handler
 	{
 	}
 	
-	private static function buildDNSString(array $params)
-	{
-		$dns = $params['type'] . ':';
-		
-		$con = array(
-			'dbname' => $params['dbname']
-		);
-		
-		if (isset($params['socket'])
-			&& file_exists($params['socket']))
-		{
-			$con['unix_socket'] = $params['socket'];
-		}
-		else
-		{
-			$con['host'] = (isset($params['host'])
-				? $params['host']
-				: 'localhost');
-			
-			if (isset($params['port']))
-			{
-				$con['port'] = $params['port'];
-			}
-		}
-		
-		foreach ($con as $key => $value)
-		{
-			$dns .= "{$key}={$value};";
-		}
-		
-		return $dns;
-	}
-	
-	public static function getInstance()
-	{
-		static $connection = null;
-		
-		if ($connection === null)
-		{
-			$connection = new Handler(
-				array(
-					'type' => 'mysql',
-					'host' => 'localhost',
-					'dbname' => 'test',
-					'username' => 'test',
-					'password' => 'test',
-				),
-				array(
-					\PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
-				)
-			);
-		}
-		
-		return $connection;
-	}
-	
 	/**
 	 * Switch to the specified database.
 	 * 
@@ -106,10 +63,9 @@ class Handler
 	 */
 	public function useDatabase($dbName)
 	{
-		if (!preg_match('/\A[a-zA-Z0-9_]+\z/iu', $dbName))
+		if (preg_match('/\s/us', $dbName) === 1)
 		{
-			throw new DbException('Invalid database name specified, only letters'
-				. ', numbers, and _ are allowed: ' . print_r($dbName, true));
+			throw new DbException('Invalid database name specified, no whitespace allowed: ' . print_r($dbName, true));
 		}
 		
 		return $this->exec('USE ' . $dbName);
@@ -209,7 +165,7 @@ class Handler
 		}
 		catch (\Exception $e)
 		{
-			throw new DbException('Failed to exec(): ' . $e->getMessage(), $query, $this);
+			throw new DbException('Failed to exec(): ' . $e->getMessage(), $query, $this->connection);
 		}
 	}
 	
@@ -234,7 +190,7 @@ class Handler
 		}
 		catch (\Exception $e)
 		{
-			throw new DbException('Failed to query(): ' . $e->getMessage(), $query, $this);
+			throw new DbException('Failed to query(): ' . $e->getMessage(), $query, $this->connection);
 		}
 	}
 	
@@ -248,7 +204,7 @@ class Handler
 	 * @throws DbException if the query is invalid
 	 * @see exec, query
 	 */
-	public function prepare($query, array $pdoParams = array())
+	public function prepare($query, array $pdoParams = [])
 	{
 		if (!is_string($query))
 		{
@@ -291,5 +247,48 @@ class Handler
 	public function getLastInsertId()
 	{
 		return $this->connection->lastInsertId();
+	}
+	
+	private static function checkDriver($driver)
+	{
+		$drivers = \PDO::getAvailableDrivers();
+		
+		if (!in_array($driver, $drivers)) {
+			throw new DbException('Unsupported connection type "' . $driver . '"'
+				. ', only the following drivers are enabled: ["' . implode('", "', $drivers) . '"]');
+		}
+	}
+	
+	private static function buildDNSString(array $params)
+	{
+		$dns = $params['driver'] . ':';
+		
+		$con = [
+			'dbname' => $params['database']
+		];
+		
+		if (isset($params['socket'])
+			&& file_exists($params['socket']))
+		{
+			$con['unix_socket'] = $params['socket'];
+		}
+		else
+		{
+			$con['host'] = (isset($params['host'])
+				? $params['host']
+				: 'localhost');
+			
+			if (isset($params['port']))
+			{
+				$con['port'] = $params['port'];
+			}
+		}
+		
+		foreach ($con as $key => $value)
+		{
+			$dns .= "{$key}={$value};";
+		}
+		
+		return $dns;
 	}
 }

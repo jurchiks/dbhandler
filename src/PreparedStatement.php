@@ -1,5 +1,7 @@
 <?php
-namespace database;
+namespace js\tools\dbhandler;
+
+use js\tools\dbhandler\exceptions\PreparedStatementException;
 
 /**
  * @author Juris Sudmalis
@@ -25,7 +27,7 @@ class PreparedStatement
 	 * @param \PDO $connection : the database connection to use
 	 * @param string $sqlQuery : the SQL query to prepare
 	 * @param array $pdoParams : see http://php.net/manual/en/pdo.prepare.php for more details
-	 * @throws DbException if failed to prepare the query
+	 * @throws PreparedStatementException if failed to prepare the query
 	 */
 	public function __construct(\PDO $connection, $sqlQuery, array $pdoParams)
 	{
@@ -39,7 +41,7 @@ class PreparedStatement
 		}
 		catch (\PDOException $e)
 		{
-			throw new DbException($e->getMessage(), $sqlQuery);
+			throw new PreparedStatementException($e->getMessage(), $sqlQuery, $this->connection);
 		}
 	}
 
@@ -48,13 +50,13 @@ class PreparedStatement
 	 *
 	 * @param array $queryParams : the parameters for the prepared SQL query
 	 * @return PreparedStatement this PreparedStatement object
-	 * @throws DbException if failed to execute the statement
+	 * @throws PreparedStatementException if failed to execute the statement
 	 */
-	public function execute(array $queryParams = array())
+	public function execute(array $queryParams = [])
 	{
 		if (!$this->statement->execute($queryParams))
 		{
-			throw new DbException('Failed to execute prepared statement', $this->sqlQuery);
+			throw new PreparedStatementException('Failed to execute prepared statement', $this->sqlQuery, $this->connection);
 		}
 		
 		$this->statementExecuted = true;
@@ -89,9 +91,9 @@ class PreparedStatement
 	 * 
 	 * @param int $fetchMode : the fetch mode to use when fetching the result set
 	 * (default: PDO::FETCH_ASSOC, one of PDO::FETCH_* allowed)
-	 * @return mixed the next row in the result set (datatype depends on fetch mode)
+	 * @return mixed the next row in the result set (data type depends on fetch mode)
 	 * or false if failed to fetch
-	 * @throws DbException a problem occurred while fetching
+	 * @throws PreparedStatementException a problem occurred while fetching
 	 * @see http://php.net/manual/en/pdostatement.fetch.php#refsect1-pdostatement.fetch-parameters
 	 */
 	public function fetchRow($fetchMode = \PDO::FETCH_ASSOC)
@@ -102,7 +104,7 @@ class PreparedStatement
 		}
 		catch (\Exception $e)
 		{
-			throw new DbException($e->getMessage(), $this->sqlQuery);
+			throw new PreparedStatementException($e->getMessage(), $this->sqlQuery, $this->connection);
 		}
 	}
 	
@@ -113,7 +115,7 @@ class PreparedStatement
 	 * (default: 0) [optional]
 	 * @return string a single column value from the next row in the result set
 	 * or false if there are no more rows
-	 * @throws DbException a problem occurred while fetching
+	 * @throws PreparedStatementException a problem occurred while fetching
 	 */
 	public function fetchColumn($colIndex = 0)
 	{
@@ -123,7 +125,7 @@ class PreparedStatement
 		}
 		catch (\Exception $e)
 		{
-			throw new DbException($e->getMessage(), $this->sqlQuery);
+			throw new PreparedStatementException($e->getMessage(), $this->sqlQuery, $this->connection);
 		}
 	}
 	
@@ -132,7 +134,7 @@ class PreparedStatement
 	 * (default: PDO::FETCH_ASSOC, one of PDO::FETCH_* allowed)
 	 * @param mixed $fetchArgument : optional argument for fetch mode
 	 * @return array an array containing all rows in the result set
-	 * @throws DbException a problem occurred while fetching
+	 * @throws PreparedStatementException a problem occurred while fetching
 	 * @see http://php.net/manual/en/pdostatement.fetch.php#refsect1-pdostatement.fetch-parameters
 	 */
 	public function fetchAllRows($fetchMode = \PDO::FETCH_ASSOC, $fetchArgument = null)
@@ -142,9 +144,9 @@ class PreparedStatement
 			// if the second argument is provided with FETCH_ASSOC, it always throws an error
 			// there is no default value that could be passed that wouldn't throw it
 			if (($fetchArgument !== null)
-				&& ($fetchMode & \PDO::FETCH_CLASS > 0)
-					|| ($fetchMode & \PDO::FETCH_FUNC > 0)
-					|| ($fetchMode & \PDO::FETCH_COLUMN > 0))
+				&& ((($fetchMode & \PDO::FETCH_CLASS) > 0)
+					|| (($fetchMode & \PDO::FETCH_FUNC) > 0)
+					|| (($fetchMode & \PDO::FETCH_COLUMN) > 0)))
 			{
 				return $this->statement->fetchAll($fetchMode, $fetchArgument);
 			}
@@ -153,7 +155,7 @@ class PreparedStatement
 		}
 		catch (\Exception $e)
 		{
-			throw new DbException($e->getMessage(), $this->sqlQuery);
+			throw new PreparedStatementException($e->getMessage(), $this->sqlQuery, $this->connection);
 		}
 	}
 	
@@ -162,7 +164,7 @@ class PreparedStatement
 	 * 
 	 * @param int $columnIndex : the index of the column to fetch (0-indexed, default: 0)
 	 * @return array an array containing all values of a single column from the result set
-	 * @throws DbException a problem occurred while fetching
+	 * @throws PreparedStatementException a problem occurred while fetching
 	 */
 	public function fetchAllRowsOfColumn($columnIndex = 0)
 	{
@@ -176,13 +178,13 @@ class PreparedStatement
 	 * and should not return anything.
 	 * 
 	 * @param callable $func : the function to execute on each row
-	 * @throws DbException if the statement hasn't been executed yet
+	 * @throws PreparedStatementException if the statement hasn't been executed yet
 	 */
 	public function forEachRow(callable $func)
 	{
 		if (!$this->statementExecuted)
 		{
-			throw new DbException('Cannot iterate over rows if statement is not executed');
+			throw new PreparedStatementException('Cannot iterate over rows if statement is not executed');
 		}
 		
 		$rows = $this->fetchAllRows();
@@ -192,21 +194,22 @@ class PreparedStatement
 	
 	/**
 	 * Apply a function to each row of the result set.
-	 * The function must accept as many parameters as there are columns
-	 * in the statement, and return whatever you want it to return.
+	 * The function must accept take one parameter
 	 * 
 	 * @param callable $func : the function to execute on each row
-	 * @throws DbException if the statement hasn't been executed yet
+	 * @throws PreparedStatementException if the statement hasn't been executed yet
 	 * @return array the result of the callback function being applied to all rows
 	 */
 	public function map(callable $func)
 	{
 		if (!$this->statementExecuted)
 		{
-			throw new DbException('Cannot iterate over rows if statement is not executed');
+			throw new PreparedStatementException('Cannot iterate over rows if statement is not executed');
 		}
 		
-		return $this->fetchAllRows(\PDO::FETCH_FUNC, $func);
+		$rows = $this->fetchAllRows();
+		
+		return array_map($func, $rows);
 	}
 	
 	/**

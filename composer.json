@@ -1,0 +1,28 @@
+{
+  "name": "jurchiks/dbhandler",
+  "type": "library",
+  "description": "PHP PDO database abstraction layer",
+  "keywords": [
+    "php",
+    "pdo",
+    "database",
+    "abstraction"
+  ],
+  "homepage": "https://github.com/jurchiks/dbhandler",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "jurchiks",
+      "email": "jurchiks101@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=5.4.0",
+    "ext-pdo": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "js\\tools\\dbhandler\\": "src/"
+    }
+  }
+}
