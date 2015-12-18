@@ -29,7 +29,7 @@ use \js\tools\dbhandler\Handler;
 try
 {
 	// TODO set your own test connection parameters!
-	$handler = new Handler([
+	$handler = Handler::getConnection('test', [
 		'driver' => 'mysql',
 		'username' => 'test',
 		'password' => 'test',

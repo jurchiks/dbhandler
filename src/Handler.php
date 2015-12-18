@@ -8,46 +8,81 @@ use js\tools\dbhandler\exceptions\DbException;
  */
 class Handler
 {
+	private $name;
 	/** @var \PDO */
 	private $connection;
+	private $connectionParameters;
+	private $connectionOptions;
 	
 	/**
-	 * Construct a new Handler instance.
-	 * 
+	 * Create and/or retrieve a named database connection. Allows for multiple connections to different servers.
+	 *
 	 * @param array $connectionParameters : an array containing connection parameters.
 	 * Required parameters: driver, username, password, database.
 	 * Optional parameters: socket | host[, port] (by default, host=localhost).
 	 * @param array $customOptions : custom PDO::ATTR_* values, e.g., [ PDO::ATTR_PERSISTENT => true ]
+	 * @param string $name : the name of this particular connection
 	 * @throws DbException if something goes wrong. This is the base exception class for all exceptions thrown by this library.
 	 */
-	public function __construct(array $connectionParameters, array $customOptions = [])
+	public static function getConnection($name = 'default', array $connectionParameters = [], array $customOptions = [])
+	{
+		if (!is_string($name))
+		{
+			throw new DbException('Invalid connection name ' . var_export($name, true));
+		}
+		
+		/** @var Handler[] */
+		static $connections = [];
+		
+		if (isset($connections[$name]))
+		{
+			// existing connection, check if it is valid and if not - try to reconnect
+			$connections[$name]->checkConnection();
+		}
+		else
+		{
+			// new connection
+			$connections[$name] = new static($name, $connectionParameters, $customOptions);
+		}
+		
+		return $connections[$name];
+	}
+	
+	private function __construct($name, $connectionParameters, $customOptions)
 	{
 		if (!isset($connectionParameters['driver'], $connectionParameters['database'], $connectionParameters['username'], $connectionParameters['password']))
 		{
 			throw new DbException('Missing required database connection parameters');
 		}
 		
-		self::checkDriver($connectionParameters['driver']);
+		$drivers = \PDO::getAvailableDrivers();
+		
+		if (!in_array($connectionParameters['driver'], $drivers))
+		{
+			throw new DbException('Unsupported connection type "' . $connectionParameters['driver'] . '"'
+				. ', only the following drivers are enabled: ["' . implode('", "', $drivers) . '"]');
+		}
 		
 		static $defaultOptions = [
 			\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
 			\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
 		];
 		
-		try
+		if (array_key_exists(\PDO::ATTR_ERRMODE, $customOptions))
 		{
-			$this->connection = new \PDO(
-				self::buildDNSString($connectionParameters),
-				$connectionParameters['username'],
-				$connectionParameters['password'],
-				array_merge($defaultOptions, $customOptions)
-			);
+			// Disallow changing error mode, exceptions are the only way forward.
+			// Use try/catch if you need to handle your problems.
+			// It makes for a lot of code bloat if I have to manually check every single call to the connection both by a try/catch
+			// and by error code if no exception was thrown.
+			unset($customOptions[\PDO::ATTR_ERRMODE]);
 		}
-		catch (\PDOException $e)
-		{
-			throw new DbException('Failed to initialize database connection. '
-				. 'Message: ' . $e->getMessage());
-		}
+		
+		$options = array_merge($defaultOptions, $customOptions);
+		
+		$this->name = $name;
+		$this->connection = self::connect($connectionParameters, $options);
+		$this->connectionParameters = $connectionParameters;
+		$this->connectionOptions = $options;
 	}
 	
 	private function __clone()
@@ -249,13 +284,42 @@ class Handler
 		return $this->connection->lastInsertId();
 	}
 	
-	private static function checkDriver($driver)
+	private function checkConnection()
 	{
-		$drivers = \PDO::getAvailableDrivers();
-		
-		if (!in_array($driver, $drivers)) {
-			throw new DbException('Unsupported connection type "' . $driver . '"'
-				. ', only the following drivers are enabled: ["' . implode('", "', $drivers) . '"]');
+		try
+		{
+			$sum = $this->connection->query('SELECT 1 + 1')->fetchColumn(0);
+			
+			if (intval($sum) !== 2)
+			{
+				// Invalid result, try reconnecting because something is clearly wrong.
+				$this->connection = self::connect($this->connectionParameters, $this->connectionOptions);
+			}
+		}
+		catch (\Exception $e)
+		{
+			// Connection may have timed out, try reconnecting.
+			// There is no single standard SQLSTATE code for "connection timed out", nor is there a built-in way to check this,
+			// so we can only guess that that's what happened.
+			$this->connection = self::connect($this->connectionParameters, $this->connectionOptions);
+		}
+	}
+	
+	private static function connect($connectionParameters, $connectionOptions)
+	{
+		try
+		{
+			return new \PDO(
+				self::buildDNSString($connectionParameters),
+				$connectionParameters['username'],
+				$connectionParameters['password'],
+				$connectionOptions
+			);
+		}
+		catch (\PDOException $e)
+		{
+			throw new DbException('Failed to initialize database connection. '
+				. 'Message: ' . $e->getMessage());
 		}
 	}
 	
