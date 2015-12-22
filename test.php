@@ -23,8 +23,9 @@ spl_autoload_register(
 	true
 );
 // common code:
-use \js\tools\dbhandler\exceptions\DbException;
-use \js\tools\dbhandler\Handler;
+use js\tools\dbhandler\exceptions\DbException;
+use js\tools\dbhandler\exceptions\QueryException;
+use js\tools\dbhandler\Handler;
 
 try
 {
@@ -44,7 +45,10 @@ catch (DbException $e)
 
 try
 {
-	$handler->exec('CREATE TABLE IF NOT EXISTS test (
+	// Inserting would throw an exception if a table by this name already existed, but didn't match the same structure,
+	// so we're deleting it first thing. Sorry if it was important!
+	$handler->exec('DROP TABLE IF EXISTS test');
+	$handler->exec('CREATE TABLE test (
 			id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			access_level INT NOT NULL,
@@ -122,8 +126,13 @@ try
 }
 catch (DbException $e)
 {
-	echo $e->getMessage(), '<br/>',
-	'Query: ', $e->getQuery(), '<br/>';
+	echo $e->getMessage(), '<br/>';
+	
+	if ($e instanceof QueryException)
+	{
+		echo 'Query: ', $e->getQuery(), '<br/>';
+	}
+	
 	print_r($e->getErrorInfo());
 }
 

@@ -2,6 +2,7 @@
 namespace js\tools\dbhandler;
 
 use js\tools\dbhandler\exceptions\DbException;
+use js\tools\dbhandler\exceptions\QueryException;
 
 /**
  * @author Juris Sudmalis
@@ -22,6 +23,7 @@ class Handler
 	 * Optional parameters: socket | host[, port] (by default, host=localhost).
 	 * @param array $customOptions : custom PDO::ATTR_* values, e.g., [ PDO::ATTR_PERSISTENT => true ]
 	 * @param string $name : the name of this particular connection
+	 * @return Handler the connection handler
 	 * @throws DbException if something goes wrong. This is the base exception class for all exceptions thrown by this library.
 	 */
 	public static function getConnection($name = 'default', array $connectionParameters = [], array $customOptions = [])
@@ -183,14 +185,14 @@ class Handler
 	 *
 	 * @param string $query : the SQL query to execute on the database
 	 * @return Handler this Handler object
-	 * @throws DbException if the query is invalid
+	 * @throws QueryException if the query is invalid
 	 * @see query, prepare, quote
 	 */
 	public function exec($query)
 	{
 		if (!is_string($query))
 		{
-			throw new DbException('Invalid SQL query', $query);
+			throw new QueryException('Invalid SQL query', $query);
 		}
 		
 		try
@@ -200,7 +202,7 @@ class Handler
 		}
 		catch (\Exception $e)
 		{
-			throw new DbException('Failed to exec(): ' . $e->getMessage(), $query, $this->connection);
+			throw new QueryException('Failed to exec(): ' . $e->getMessage(), $query, $this->connection);
 		}
 	}
 	
@@ -209,14 +211,14 @@ class Handler
 	 *
 	 * @param string $query : the SQL query to execute on the database
 	 * @return \PDOStatement|false the PDOStatement object if the query was successful, false otherwise
-	 * @throws DbException if the query is invalid
+	 * @throws QueryException if the query is invalid
 	 * @see exec, prepare, quote
 	 */
 	public function query($query)
 	{
 		if (!is_string($query))
 		{
-			throw new DbException('Invalid SQL query', $query);
+			throw new QueryException('Invalid SQL query', $query);
 		}
 		
 		try
@@ -225,7 +227,7 @@ class Handler
 		}
 		catch (\Exception $e)
 		{
-			throw new DbException('Failed to query(): ' . $e->getMessage(), $query, $this->connection);
+			throw new QueryException('Failed to query(): ' . $e->getMessage(), $query, $this->connection);
 		}
 	}
 	
@@ -243,7 +245,7 @@ class Handler
 	{
 		if (!is_string($query))
 		{
-			throw new DbException('Invalid SQL query', $query);
+			throw new QueryException('Invalid SQL query', $query);
 		}
 		
 		return new PreparedStatement($this->connection, $query, $pdoParams);

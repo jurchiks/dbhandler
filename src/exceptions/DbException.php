@@ -6,39 +6,25 @@ namespace js\tools\dbhandler\exceptions;
  */
 class DbException extends \Exception
 {
-	/** @var string */
-	private $query;
 	/** @var array */
-	private $errorDetails;
+	private $errorInfo;
 	
 	/**
 	 * @param string $message : the error message
-	 * @param string $query : the SQL query that caused the exception (optional)
 	 * @param \PDO|null $connection : the connection to retrieve the error info from
 	 */
-	public function __construct($message, $query = '', \PDO $connection = null)
+	public function __construct($message, \PDO $connection = null)
 	{
 		parent::__construct($message);
-		$this->query = $query;
 		
 		if (is_null($connection))
 		{
-			$this->errorDetails = [];
+			$this->errorInfo = [];
 		}
 		else
 		{
-			$this->errorDetails = $connection->errorInfo();
+			$this->errorInfo = $connection->errorInfo();
 		}
-	}
-	
-	/**
-	 * Get the SQL query that caused this exception.
-	 * 
-	 * @return string
-	 */
-	public function getQuery()
-	{
-		return print_r($this->query, true);
 	}
 	
 	/**
@@ -48,6 +34,6 @@ class DbException extends \Exception
 	 */
 	public function getErrorInfo()
 	{
-		return $this->errorDetails;
+		return $this->errorInfo;
 	}
 }
