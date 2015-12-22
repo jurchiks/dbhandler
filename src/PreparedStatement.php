@@ -54,9 +54,13 @@ class PreparedStatement
 	 */
 	public function execute(array $queryParams = [])
 	{
-		if (!$this->statement->execute($queryParams))
+		try
 		{
-			throw new PreparedStatementException('Failed to execute prepared statement', $this->sqlQuery, $this->connection);
+			$this->statement->execute($queryParams);
+		}
+		catch (\PDOException $e)
+		{
+			throw new PreparedStatementException('Failed to execute prepared statement: ' . $e->getMessage(), $this->sqlQuery, $this->connection);
 		}
 		
 		$this->statementExecuted = true;
