@@ -33,13 +33,16 @@ class Handler
 			throw new DbException('Invalid connection name ' . var_export($name, true));
 		}
 		
-		/** @var Handler[] */
+		/** @var Handler[] $connections */
 		static $connections = [];
 		
 		if (isset($connections[$name]))
 		{
 			// existing connection, check if it is valid and if not - try to reconnect
-			$connections[$name]->checkConnection();
+			if (!$connections[$name]->checkConnection())
+			{
+				$connections[$name]->connect();
+			}
 		}
 		else
 		{
@@ -82,9 +85,10 @@ class Handler
 		$options = array_merge($defaultOptions, $customOptions);
 		
 		$this->name = $name;
-		$this->connection = self::connect($connectionParameters, $options);
 		$this->connectionParameters = $connectionParameters;
 		$this->connectionOptions = $options;
+		
+		$this->connect();
 	}
 	
 	private function __clone()
@@ -286,36 +290,49 @@ class Handler
 		return $this->connection->lastInsertId();
 	}
 	
-	private function checkConnection()
+	public function checkConnection()
 	{
 		try
 		{
-			$sum = $this->connection->query('SELECT 1 + 1')->fetchColumn(0);
+			// this throws an error (not an exception) if the connection has gone away;
+			// needs to be suppressed because we want only exceptions
+			$sum = @$this->connection->query('SELECT 1 + 1');
+			
+			if ($sum instanceof \PDOStatement)
+			{
+				$sum = $sum->fetchColumn(0);
+			}
+			else
+			{
+				$sum = 0;
+			}
 			
 			if (intval($sum) !== 2)
 			{
-				// Invalid result, try reconnecting because something is clearly wrong.
-				$this->connection = self::connect($this->connectionParameters, $this->connectionOptions);
+				// Invalid result, something is clearly wrong.
+				return false;
 			}
 		}
 		catch (\Exception $e)
 		{
-			// Connection may have timed out, try reconnecting.
+			// Connection may have timed out.
 			// There is no single standard SQLSTATE code for "connection timed out", nor is there a built-in way to check this,
 			// so we can only guess that that's what happened.
-			$this->connection = self::connect($this->connectionParameters, $this->connectionOptions);
+			return false;
 		}
+		
+		return true;
 	}
 	
-	private static function connect($connectionParameters, $connectionOptions)
+	public function connect()
 	{
 		try
 		{
-			return new \PDO(
-				self::buildDNSString($connectionParameters),
-				$connectionParameters['username'],
-				$connectionParameters['password'],
-				$connectionOptions
+			$this->connection = new \PDO(
+				self::buildDNSString($this->connectionParameters),
+				$this->connectionParameters['username'],
+				$this->connectionParameters['password'],
+				$this->connectionOptions
 			);
 		}
 		catch (\PDOException $e)

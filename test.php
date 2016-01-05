@@ -1,28 +1,6 @@
 <?php
-// composer code:
-// require __DIR__ . '/vendor/autoload.php';
-// non-composer code (can run this in console immediately):
-spl_autoload_register(
-	function ($className)
-	{
-		$ds = DIRECTORY_SEPARATOR;
-		$className = str_replace('js\\tools\\dbhandler', '', $className);
-		$className = str_replace('\\', $ds, $className);
-		$className = trim($className, $ds);
-		
-		$path = __DIR__ . $ds . 'src' . $ds . $className . '.php';
-		
-		if (!is_readable($path))
-		{
-			return false;
-		}
-		
-		require $path;
-		return true;
-	},
-	true
-);
-// common code:
+require 'autoloader.php';
+
 use js\tools\dbhandler\exceptions\DbException;
 use js\tools\dbhandler\exceptions\QueryException;
 use js\tools\dbhandler\Handler;
