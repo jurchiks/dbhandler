@@ -1,6 +1,8 @@
 <?php
 namespace js\tools\dbhandler\exceptions;
 
+use PDO;
+
 class QueryException extends DbException
 {
 	/** @var string */
@@ -9,9 +11,9 @@ class QueryException extends DbException
 	/**
 	 * @param string $message : the error message
 	 * @param string $query : the SQL query that caused the exception (optional)
-	 * @param \PDO|null $connection : the connection to retrieve the error info from
+	 * @param PDO|null $connection : the connection to retrieve the error info from
 	 */
-	public function __construct($message, $query, \PDO $connection = null)
+	public function __construct(string $message, string $query, PDO $connection = null)
 	{
 		parent::__construct($message, $connection);
 		
@@ -23,7 +25,7 @@ class QueryException extends DbException
 	 *
 	 * @return string
 	 */
-	public function getQuery()
+	public function getQuery(): string
 	{
 		return print_r($this->query, true);
 	}

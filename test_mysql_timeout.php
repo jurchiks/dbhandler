@@ -3,16 +3,12 @@ require 'autoloader.php';
 
 use js\tools\dbhandler\exceptions\DbException;
 use js\tools\dbhandler\Handler;
+use js\tools\dbhandler\parameters\MySQL;
 
 try
 {
 	// TODO set your own test connection parameters!
-	$handler = Handler::getConnection('test', [
-		'driver' => 'mysql',
-		'username' => 'test',
-		'password' => 'test',
-		'database' => 'test',
-	]);
+	$handler = Handler::getConnection('test', MySQL::viaHost('test', 'test', 'test'));
 	// this is the mysql.ini variable that should be adjusted according to needs
 	// but it works via query as well
 	$handler->exec('SET SESSION wait_timeout = 1');

@@ -1,16 +1,20 @@
 <?php
 namespace js\tools\dbhandler;
 
+use Exception;
 use js\tools\dbhandler\exceptions\PreparedStatementException;
+use PDO;
+use PDOException;
+use PDOStatement;
 
 /**
  * @author Juris Sudmalis
  */
 class PreparedStatement
 {
-	/** @var \PDO */
+	/** @var PDO */
 	private $connection;
-	/** @var \PDOStatement */
+	/** @var PDOStatement */
 	private $statement;
 	/** @var string */
 	private $sqlQuery;
@@ -24,12 +28,12 @@ class PreparedStatement
 	/**
 	 * Create a new PreparedStatement object.
 	 * 
-	 * @param \PDO $connection : the database connection to use
+	 * @param PDO $connection : the database connection to use
 	 * @param string $sqlQuery : the SQL query to prepare
 	 * @param array $pdoParams : see http://php.net/manual/en/pdo.prepare.php for more details
 	 * @throws PreparedStatementException if failed to prepare the query
 	 */
-	public function __construct(\PDO $connection, $sqlQuery, array $pdoParams)
+	public function __construct(PDO $connection, string $sqlQuery, array $pdoParams)
 	{
 		$this->connection = $connection;
 		$this->sqlQuery = $sqlQuery;
@@ -39,7 +43,7 @@ class PreparedStatement
 		{
 			$this->statement = $this->connection->prepare($sqlQuery, $pdoParams);
 		}
-		catch (\PDOException $e)
+		catch (PDOException $e)
 		{
 			throw new PreparedStatementException($e->getMessage(), $sqlQuery, $this->connection);
 		}
@@ -58,7 +62,7 @@ class PreparedStatement
 		{
 			$this->statement->execute($queryParams);
 		}
-		catch (\PDOException $e)
+		catch (PDOException $e)
 		{
 			throw new PreparedStatementException('Failed to execute prepared statement: ' . $e->getMessage(), $this->sqlQuery, $this->connection);
 		}
@@ -81,7 +85,7 @@ class PreparedStatement
 					$this->foundRows = (empty($count) ? 0 : intval($count));
 				}
 			}
-			catch (\Exception $e)
+			catch (Exception $e)
 			{
 				$this->foundRows = 0;
 			}
@@ -100,13 +104,13 @@ class PreparedStatement
 	 * @throws PreparedStatementException a problem occurred while fetching
 	 * @see http://php.net/manual/en/pdostatement.fetch.php#refsect1-pdostatement.fetch-parameters
 	 */
-	public function fetchRow($fetchMode = \PDO::FETCH_ASSOC)
+	public function fetchRow($fetchMode = PDO::FETCH_ASSOC)
 	{
 		try
 		{
 			return $this->statement->fetch($fetchMode);
 		}
-		catch (\Exception $e)
+		catch (Exception $e)
 		{
 			throw new PreparedStatementException($e->getMessage(), $this->sqlQuery, $this->connection);
 		}
@@ -127,7 +131,7 @@ class PreparedStatement
 		{
 			return $this->statement->fetchColumn($colIndex);
 		}
-		catch (\Exception $e)
+		catch (Exception $e)
 		{
 			throw new PreparedStatementException($e->getMessage(), $this->sqlQuery, $this->connection);
 		}
@@ -141,23 +145,23 @@ class PreparedStatement
 	 * @throws PreparedStatementException a problem occurred while fetching
 	 * @see http://php.net/manual/en/pdostatement.fetch.php#refsect1-pdostatement.fetch-parameters
 	 */
-	public function fetchAllRows($fetchMode = \PDO::FETCH_ASSOC, $fetchArgument = null)
+	public function fetchAllRows($fetchMode = PDO::FETCH_ASSOC, $fetchArgument = null): array
 	{
 		try
 		{
 			// if the second argument is provided with FETCH_ASSOC, it always throws an error
 			// there is no default value that could be passed that wouldn't throw it
 			if (($fetchArgument !== null)
-				&& ((($fetchMode & \PDO::FETCH_CLASS) > 0)
-					|| (($fetchMode & \PDO::FETCH_FUNC) > 0)
-					|| (($fetchMode & \PDO::FETCH_COLUMN) > 0)))
+				&& ((($fetchMode & PDO::FETCH_CLASS) > 0)
+					|| (($fetchMode & PDO::FETCH_FUNC) > 0)
+					|| (($fetchMode & PDO::FETCH_COLUMN) > 0)))
 			{
 				return $this->statement->fetchAll($fetchMode, $fetchArgument);
 			}
 			
 			return $this->statement->fetchAll($fetchMode);
 		}
-		catch (\Exception $e)
+		catch (Exception $e)
 		{
 			throw new PreparedStatementException($e->getMessage(), $this->sqlQuery, $this->connection);
 		}
@@ -170,9 +174,9 @@ class PreparedStatement
 	 * @return array an array containing all values of a single column from the result set
 	 * @throws PreparedStatementException a problem occurred while fetching
 	 */
-	public function fetchAllRowsOfColumn($columnIndex = 0)
+	public function fetchAllRowsOfColumn($columnIndex = 0): array
 	{
-		return $this->fetchAllRows(\PDO::FETCH_COLUMN, $columnIndex);
+		return $this->fetchAllRows(PDO::FETCH_COLUMN, $columnIndex);
 	}
 	
 	/**
@@ -204,7 +208,7 @@ class PreparedStatement
 	 * @throws PreparedStatementException if the statement hasn't been executed yet
 	 * @return array the result of the callback function being applied to all rows
 	 */
-	public function map(callable $func)
+	public function map(callable $func): array
 	{
 		if (!$this->statementExecuted)
 		{
@@ -222,7 +226,7 @@ class PreparedStatement
 	 * 
 	 * @return int the number of found rows
 	 */
-	public function getFoundRows()
+	public function getFoundRows(): int
 	{
 		return $this->foundRows;
 	}
@@ -230,7 +234,7 @@ class PreparedStatement
 	/**
 	 * @return int the number of rows inserted/updated/deleted by the last executed SQL query
 	 */
-	public function getAffectedRowCount()
+	public function getAffectedRowCount(): int
 	{
 		return ($this->statementExecuted
 			? $this->statement->rowCount()
@@ -238,7 +242,7 @@ class PreparedStatement
 	}
 	
 	/**
-	 * @return int the value of the last inserted AUTO_INCREMENT column
+	 * @return string|int the value of the last inserted AUTO_INCREMENT column
 	 * @see http://php.net/manual/en/pdo.lastinsertid.php
 	 */
 	public function getLastInsertId()

@@ -1,19 +1,22 @@
 <?php
 namespace js\tools\dbhandler\exceptions;
 
+use Exception;
+use PDO;
+
 /**
  * @author Juris Sudmalis
  */
-class DbException extends \Exception
+class DbException extends Exception
 {
 	/** @var array */
 	private $errorInfo;
 	
 	/**
 	 * @param string $message : the error message
-	 * @param \PDO|null $connection : the connection to retrieve the error info from
+	 * @param PDO|null $connection : the connection to retrieve the error info from
 	 */
-	public function __construct($message, \PDO $connection = null)
+	public function __construct(string $message, PDO $connection = null)
 	{
 		parent::__construct($message);
 		
@@ -32,7 +35,7 @@ class DbException extends \Exception
 	 * 
 	 * @return array an array containing the error details
 	 */
-	public function getErrorInfo()
+	public function getErrorInfo(): array
 	{
 		return $this->errorInfo;
 	}

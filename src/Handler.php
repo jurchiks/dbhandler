@@ -1,8 +1,13 @@
 <?php
 namespace js\tools\dbhandler;
 
+use Exception;
 use js\tools\dbhandler\exceptions\DbException;
 use js\tools\dbhandler\exceptions\QueryException;
+use js\tools\dbhandler\parameters\ConnectionParameters;
+use PDO;
+use PDOException;
+use PDOStatement;
 
 /**
  * @author Juris Sudmalis
@@ -10,7 +15,7 @@ use js\tools\dbhandler\exceptions\QueryException;
 class Handler
 {
 	private $name;
-	/** @var \PDO */
+	/** @var PDO */
 	private $connection;
 	private $connectionParameters;
 	private $connectionOptions;
@@ -18,21 +23,14 @@ class Handler
 	/**
 	 * Create and/or retrieve a named database connection. Allows for multiple connections to different servers.
 	 *
-	 * @param array $connectionParameters : an array containing connection parameters.
-	 * Required parameters: driver, username, password, database.
-	 * Optional parameters: socket | host[, port] (by default, host=localhost).
+	 * @param ConnectionParameters $connectionParameters : a connection parameter container
 	 * @param array $customOptions : custom PDO::ATTR_* values, e.g., [ PDO::ATTR_PERSISTENT => true ]
 	 * @param string $name : the name of this particular connection
 	 * @return Handler the connection handler
 	 * @throws DbException if something goes wrong. This is the base exception class for all exceptions thrown by this library.
 	 */
-	public static function getConnection($name = 'default', array $connectionParameters = [], array $customOptions = [])
+	public static function getConnection(string $name = 'default', ConnectionParameters $connectionParameters = null, array $customOptions = [])
 	{
-		if (!is_string($name))
-		{
-			throw new DbException('Invalid connection name ' . var_export($name, true));
-		}
-		
 		/** @var Handler[] $connections */
 		static $connections = [];
 		
@@ -46,6 +44,11 @@ class Handler
 		}
 		else
 		{
+			if ($connectionParameters === null)
+			{
+				throw new DbException('Cannot create a connection without parameters');
+			}
+			
 			// new connection
 			$connections[$name] = new static($name, $connectionParameters, $customOptions);
 		}
@@ -53,33 +56,28 @@ class Handler
 		return $connections[$name];
 	}
 	
-	private function __construct($name, $connectionParameters, $customOptions)
+	private function __construct(string $name, ConnectionParameters $connectionParameters, array $customOptions)
 	{
-		if (!isset($connectionParameters['driver'], $connectionParameters['database'], $connectionParameters['username'], $connectionParameters['password']))
-		{
-			throw new DbException('Missing required database connection parameters');
-		}
+		$drivers = PDO::getAvailableDrivers();
 		
-		$drivers = \PDO::getAvailableDrivers();
-		
-		if (!in_array($connectionParameters['driver'], $drivers))
+		if (!in_array($connectionParameters::DRIVER, $drivers))
 		{
-			throw new DbException('Unsupported connection type "' . $connectionParameters['driver'] . '"'
+			throw new DbException('Unsupported connection type "' . $connectionParameters::DRIVER . '"'
 				. ', only the following drivers are enabled: ["' . implode('", "', $drivers) . '"]');
 		}
 		
 		static $defaultOptions = [
-			\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-			\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+			PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+			PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 		];
 		
-		if (array_key_exists(\PDO::ATTR_ERRMODE, $customOptions))
+		if (array_key_exists(PDO::ATTR_ERRMODE, $customOptions))
 		{
 			// Disallow changing error mode, exceptions are the only way forward.
 			// Use try/catch if you need to handle your problems.
 			// It makes for a lot of code bloat if I have to manually check every single call to the connection both by a try/catch
 			// and by error code if no exception was thrown.
-			unset($customOptions[\PDO::ATTR_ERRMODE]);
+			unset($customOptions[PDO::ATTR_ERRMODE]);
 		}
 		
 		$options = array_merge($defaultOptions, $customOptions);
@@ -116,7 +114,7 @@ class Handler
 	 * @return array an array containing information about the last error
 	 * that occurred in this database handle (not in any statement handle).
 	 */
-	public function errorInfo()
+	public function errorInfo(): array
 	{
 		return $this->connection->errorInfo();
 	}
@@ -137,7 +135,7 @@ class Handler
 	 *
 	 * @return boolean true if this connection is currently in transaction mode, false otherwise
 	 */
-	public function inTransaction()
+	public function inTransaction(): bool
 	{
 		return $this->connection->inTransaction();
 	}
@@ -169,12 +167,12 @@ class Handler
 	 * Note: it is strongly recommended to use prepared statements instead of
 	 * manually escaping values!
 	 *
-	 * @param string $string : the string to quote
+	 * @param string|null $string : the string to quote
 	 * @param int $dataType : a PDO::PARAM_* value that specifies
 	 * how to quote the value (default: PDO::PARAM_STR)
 	 * @return string the quoted string
 	 */
-	public function quote($string, $dataType = \PDO::PARAM_STR)
+	public function quote(string $string = null, $dataType = PDO::PARAM_STR)
 	{
 		if (is_null($string))
 		{
@@ -192,19 +190,14 @@ class Handler
 	 * @throws QueryException if the query is invalid
 	 * @see query, prepare, quote
 	 */
-	public function exec($query)
+	public function exec(string $query)
 	{
-		if (!is_string($query))
-		{
-			throw new QueryException('Invalid SQL query', $query);
-		}
-		
 		try
 		{
 			$this->connection->exec($query);
 			return $this;
 		}
-		catch (\Exception $e)
+		catch (Exception $e)
 		{
 			throw new QueryException('Failed to exec(): ' . $e->getMessage(), $query, $this->connection);
 		}
@@ -214,22 +207,17 @@ class Handler
 	 * Execute a query on the database and retrieve the result set.
 	 *
 	 * @param string $query : the SQL query to execute on the database
-	 * @return \PDOStatement|false the PDOStatement object if the query was successful, false otherwise
+	 * @return PDOStatement|false the PDOStatement object if the query was successful, false otherwise
 	 * @throws QueryException if the query is invalid
 	 * @see exec, prepare, quote
 	 */
-	public function query($query)
+	public function query(string $query)
 	{
-		if (!is_string($query))
-		{
-			throw new QueryException('Invalid SQL query', $query);
-		}
-		
 		try
 		{
 			return $this->connection->query($query);
 		}
-		catch (\Exception $e)
+		catch (Exception $e)
 		{
 			throw new QueryException('Failed to query(): ' . $e->getMessage(), $query, $this->connection);
 		}
@@ -245,13 +233,8 @@ class Handler
 	 * @throws DbException if the query is invalid
 	 * @see exec, query
 	 */
-	public function prepare($query, array $pdoParams = [])
+	public function prepare(string $query, array $pdoParams = []): PreparedStatement
 	{
-		if (!is_string($query))
-		{
-			throw new QueryException('Invalid SQL query', $query);
-		}
-		
 		return new PreparedStatement($this->connection, $query, $pdoParams);
 	}
 	
@@ -261,7 +244,7 @@ class Handler
 	 * 
 	 * @return int the number of found rows
 	 */
-	public function getFoundRows()
+	public function getFoundRows(): int
 	{
 		try
 		{
@@ -276,18 +259,19 @@ class Handler
 			
 			return (empty($count) ? 0 : intval($count));
 		}
-		catch (\Exception $e)
+		catch (Exception $e)
 		{
 			return 0;
 		}
 	}
 	
 	/**
-	 * @return int the ID of the last row that was inserted via this connection
+	 * @param string|null $sequence : name of the sequence object from which the ID should be returned
+	 * @return string the ID of the last row that was inserted via this connection
 	 */
-	public function getLastInsertId()
+	public function getLastInsertId(string $sequence = null): string
 	{
-		return $this->connection->lastInsertId();
+		return $this->connection->lastInsertId($sequence);
 	}
 	
 	public function checkConnection()
@@ -298,7 +282,7 @@ class Handler
 			// needs to be suppressed because we want only exceptions
 			$sum = @$this->connection->query('SELECT 1 + 1');
 			
-			if ($sum instanceof \PDOStatement)
+			if ($sum instanceof PDOStatement)
 			{
 				$sum = $sum->fetchColumn(0);
 			}
@@ -313,7 +297,7 @@ class Handler
 				return false;
 			}
 		}
-		catch (\Exception $e)
+		catch (Exception $e)
 		{
 			// Connection may have timed out.
 			// There is no single standard SQLSTATE code for "connection timed out", nor is there a built-in way to check this,
@@ -328,50 +312,17 @@ class Handler
 	{
 		try
 		{
-			$this->connection = new \PDO(
-				self::buildDNSString($this->connectionParameters),
-				$this->connectionParameters['username'],
-				$this->connectionParameters['password'],
+			$this->connection = new PDO(
+				$this->connectionParameters->getConnectionString(),
+				$this->connectionParameters->getUsername(),
+				$this->connectionParameters->getPassword(),
 				$this->connectionOptions
 			);
 		}
-		catch (\PDOException $e)
+		catch (PDOException $e)
 		{
 			throw new DbException('Failed to initialize database connection. '
 				. 'Message: ' . $e->getMessage());
 		}
-	}
-	
-	private static function buildDNSString(array $params)
-	{
-		$dns = $params['driver'] . ':';
-		
-		$con = [
-			'dbname' => $params['database']
-		];
-		
-		if (isset($params['socket'])
-			&& file_exists($params['socket']))
-		{
-			$con['unix_socket'] = $params['socket'];
-		}
-		else
-		{
-			$con['host'] = (isset($params['host'])
-				? $params['host']
-				: 'localhost');
-			
-			if (isset($params['port']))
-			{
-				$con['port'] = $params['port'];
-			}
-		}
-		
-		foreach ($con as $key => $value)
-		{
-			$dns .= "{$key}={$value};";
-		}
-		
-		return $dns;
 	}
 }
