@@ -1,6 +1,6 @@
 # dbhandler
 
-Requirements: PHP 5.4+
+Requirements: PHP 7.0.0+
 
 These classes are made to simplify database operations via the PHP PDO interface.
 
