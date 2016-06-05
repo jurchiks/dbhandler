@@ -80,7 +80,7 @@ class Handler
 			unset($customOptions[PDO::ATTR_ERRMODE]);
 		}
 		
-		$options = array_merge($defaultOptions, $customOptions);
+		$options = array_replace($defaultOptions, $customOptions);
 		
 		$this->name = $name;
 		$this->connectionParameters = $connectionParameters;
