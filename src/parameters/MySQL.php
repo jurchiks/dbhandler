@@ -7,7 +7,9 @@ class MySQL extends ConnectionParameters
 {
 	const DRIVER = 'mysql';
 	
-	public static function viaSocket(string $dbname, string $username, string $password, string $socket)
+	public static function viaSocket(
+		string $dbname, string $username, string $password, string $socket, string $charset = 'utf8'
+	)
 	{
 		if (!file_exists($socket))
 		{
@@ -15,15 +17,17 @@ class MySQL extends ConnectionParameters
 		}
 		
 		$con = [
-			'dbname'      => $dbname,
+			'dbname' => $dbname,
 			'unix_socket' => $socket,
+			'charset' => $charset,
 		];
 		
 		return new static(self::buildDNS($con), $username, $password);
 	}
 	
 	public static function viaHost(
-		string $dbname, string $username, string $password, string $host = 'localhost', int $port = null
+		string $dbname, string $username, string $password, string $host = 'localhost', int $port = null,
+		string $charset = 'utf8'
 	)
 	{
 		$con = [
@@ -35,6 +39,8 @@ class MySQL extends ConnectionParameters
 		{
 			$con['port'] = $port;
 		}
+		
+		$con['charset'] = $charset;
 		
 		return new static(self::buildDNS($con), $username, $password);
 	}

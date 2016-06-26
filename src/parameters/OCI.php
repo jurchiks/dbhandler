@@ -13,10 +13,12 @@ class OCI extends ConnectionParameters
 	 * @param string $password
 	 * @param string $host
 	 * @param int $port
+	 * @param string $charset
 	 * @return static
 	 */
 	public static function viaHost(
-		string $dbname, string $username, string $password, string $host = '', int $port = null
+		string $dbname, string $username, string $password, string $host = '', int $port = null,
+		string $charset = 'UTF8'
 	)
 	{
 		if ($host)
@@ -38,6 +40,6 @@ class OCI extends ConnectionParameters
 			$dns = $dbname;
 		}
 		
-		return new static(self::buildDNS(['database' => $dns]), $username, $password);
+		return new static(self::buildDNS(['database' => $dns, 'charset' => $charset]), $username, $password);
 	}
 }
