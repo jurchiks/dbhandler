@@ -101,10 +101,10 @@ class PreparedStatement
 	 * (default: PDO::FETCH_ASSOC, one of PDO::FETCH_* allowed)
 	 * @return mixed the next row in the result set (data type depends on fetch mode)
 	 * or false if failed to fetch
-	 * @throws PreparedStatementException a problem occurred while fetching
+	 * @throws PreparedStatementException if a problem occurred while fetching
 	 * @see http://php.net/manual/en/pdostatement.fetch.php#refsect1-pdostatement.fetch-parameters
 	 */
-	public function fetchRow($fetchMode = PDO::FETCH_ASSOC)
+	public function fetchRow(int $fetchMode = PDO::FETCH_ASSOC)
 	{
 		try
 		{
@@ -123,9 +123,9 @@ class PreparedStatement
 	 * (default: 0) [optional]
 	 * @return string a single column value from the next row in the result set
 	 * or false if there are no more rows
-	 * @throws PreparedStatementException a problem occurred while fetching
+	 * @throws PreparedStatementException if a problem occurred while fetching
 	 */
-	public function fetchColumn($colIndex = 0)
+	public function fetchColumn(int $colIndex = 0)
 	{
 		try
 		{
@@ -142,10 +142,10 @@ class PreparedStatement
 	 * (default: PDO::FETCH_ASSOC, one of PDO::FETCH_* allowed)
 	 * @param mixed $fetchArgument : optional argument for fetch mode
 	 * @return array an array containing all rows in the result set
-	 * @throws PreparedStatementException a problem occurred while fetching
+	 * @throws PreparedStatementException if a problem occurred while fetching
 	 * @see http://php.net/manual/en/pdostatement.fetch.php#refsect1-pdostatement.fetch-parameters
 	 */
-	public function fetchAllRows($fetchMode = PDO::FETCH_ASSOC, $fetchArgument = null): array
+	public function fetchAllRows(int $fetchMode = PDO::FETCH_ASSOC, $fetchArgument = null): array
 	{
 		try
 		{
@@ -174,50 +174,64 @@ class PreparedStatement
 	 * @return array an array containing all values of a single column from the result set
 	 * @throws PreparedStatementException a problem occurred while fetching
 	 */
-	public function fetchAllRowsOfColumn($columnIndex = 0): array
+	public function fetchAllRowsOfColumn(int $columnIndex = 0): array
 	{
 		return $this->fetchAllRows(PDO::FETCH_COLUMN, $columnIndex);
 	}
 	
 	/**
 	 * Execute a function for each row in the result set.
-	 * The function must accept an array as the first parameter, an integer
-	 * as an optional second parameter (row index in the result set),
-	 * and should not return anything.
 	 * 
-	 * @param callable $func : the function to execute on each row
+	 * @param callable $callback : the function to execute on each row.
+	 * If the callback function returns false, iteration is stopped.
+	 * Signature - (array $rowAssoc, int $index): void|bool
 	 * @throws PreparedStatementException if the statement hasn't been executed yet
 	 */
-	public function forEachRow(callable $func)
+	public function forEachRow(callable $callback)
 	{
 		if (!$this->statementExecuted)
 		{
 			throw new PreparedStatementException('Cannot iterate over rows if statement is not executed');
 		}
 		
-		$rows = $this->fetchAllRows();
+		$i = 0;
 		
-		array_walk($rows, $func);
+		while ($row = $this->fetchRow())
+		{
+			if ($callback($row, $i) === false)
+			{
+				break;
+			}
+			
+			$i++;
+		}
 	}
 	
 	/**
 	 * Apply a function to each row of the result set.
-	 * The function must accept take one parameter
 	 * 
-	 * @param callable $func : the function to execute on each row
+	 * @param callable $callback : the function to execute on each row.
+	 * Signature - (array $row, int $index): mixed
 	 * @throws PreparedStatementException if the statement hasn't been executed yet
 	 * @return array the result of the callback function being applied to all rows
 	 */
-	public function map(callable $func): array
+	public function map(callable $callback): array
 	{
 		if (!$this->statementExecuted)
 		{
 			throw new PreparedStatementException('Cannot iterate over rows if statement is not executed');
 		}
 		
-		$rows = $this->fetchAllRows();
+		$i = 0;
+		$data = [];
 		
-		return array_map($func, $rows);
+		while ($row = $this->fetchRow())
+		{
+			$data[] = $callback($row, $i);
+			$i++;
+		}
+		
+		return $data;
 	}
 	
 	/**
